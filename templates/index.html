@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>News Bias Lab</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css" rel="stylesheet">
+  <style>
+    body{background:#f6f7fb}
+    .card{border-radius:14px}
+  </style>
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="#">News Bias Lab</a>
+    <div class="navbar-text small text-secondary">练习识别与减少新闻偏见</div>
+  </div>
+</nav>
+
+<main class="container my-4">
+  <div class="row g-3">
+
+    <!-- 左侧：事实卡 / 判定 / 写作评分 -->
+    <div class="col-lg-8">
+
+      <!-- 事实卡 -->
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <span class="badge bg-primary" id="topic-badge">(topic)</span>
+              <!-- 按你的要求：不显示任何会暗示立场/frame的标签，直接删掉 meta-badge -->
+            </div>
+            <div class="text-muted small" id="article-id">#</div>
+          </div>
+          <h4 class="card-title" id="title">标题加载中…</h4>
+          <p class="card-text" id="text" style="white-space: pre-wrap;">正文加载中…</p>
+
+          <div class="d-flex gap-2 mt-3">
+            <button id="btn-refresh" class="btn btn-outline-secondary btn-sm">换一篇（R）</button>
+            <select id="topic-select" class="form-select form-select-sm w-auto">
+              <option value="">所有主题</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 你的判定（仅凭个人判断） -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h6 class="fw-bold mb-3">你的判断</h6>
+          <form id="judge-form" class="row gy-2">
+            <div class="col-12">
+              <label class="form-label">是否有偏见？</label>
+              <div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="bias_yes" id="bias_yes1" value="1">
+                  <label class="form-check-label" for="bias_yes1">有</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="bias_yes" id="bias_yes0" value="0" checked>
+                  <label class="form-check-label" for="bias_yes0">无</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">偏向哪一方</label>
+              <select class="form-select" id="bias_side">
+                <option value="">未选择</option>
+                <option value="Government">政府</option>
+                <option value="Corporation">企业</option>
+                <option value="Public">公众</option>
+                <option value="Other">其他</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+  <label class="form-label">
+    偏见强度（0=弱 / 1=中 / 2=强） 
+    <span id="bias_strength_value" class="ms-1 text-muted"></span>
+  </label>
+
+  <!-- 关键修改：min=0, max=2, step=1 -->
+  <input type="range" class="form-range" min="0" max="2" step="1" id="bias_strength" value="0">
+
+  <!-- 可选：给用户显示档位刻度 -->
+  <div class="d-flex justify-content-between small text-muted mt-1">
+    <span>0</span><span>1</span><span>2</span>
+  </div>
+</div>
+
+
+
+            <!-- 偏见类型：只保留 frame 五类（单选） -->
+            <div class="col-12">
+              <label class="form-label">偏见类型（Frame，单选）</label>
+              <div class="d-flex flex-wrap gap-3">
+                <div class="form-check"><input class="form-check-input" type="radio" name="frame_type" id="f1" value="conflict"><label class="form-check-label" for="f1">conflict</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="frame_type" id="f2" value="human_interest"><label class="form-check-label" for="f2">human_interest</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="frame_type" id="f3" value="economic"><label class="form-check-label" for="f3">economic</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="frame_type" id="f4" value="morality"><label class="form-check-label" for="f4">morality</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="frame_type" id="f5" value="responsibility"><label class="form-check-label" for="f5">responsibility</label></div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">原因/备注</label>
+              <textarea class="form-control" id="reasons" rows="3" placeholder="说明你为何这样判断"></textarea>
+            </div>
+
+            <div class="col-12">
+              <button id="btn-submit" type="submit" class="btn btn-primary">提交并下一篇</button>
+              <!-- 参考标注(DB)相关按钮与逻辑已移除，确保只基于个人判断 -->
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 写作 + BERT 打分（练习用，不影响上面的个人判断） -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold mb-0">写一段新闻，并用 BERT 多任务模型评分</h6>
+            <span class="text-muted small">输出：是否有偏见 / frame 五类 / 强度 0-2</span>
+          </div>
+          <div class="mt-2">
+            <textarea id="compose-text" class="form-control" rows="8"
+              placeholder="请以客观中立的新闻报道体写 100–300 字，不要参考任何自动标注。"></textarea>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <button id="btn-score-compose" class="btn btn-success btn-sm">评分（BERT）</button>
+            <span id="compose-hint" class="text-muted small"></span>
+          </div>
+
+          <div id="compose-result" class="mt-3 p-3 border rounded d-none">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <div><b>是否有偏见：</b><span id="c-yes">—</span></div>
+                <div class="small text-muted"> <span id="c-proba"> </span></div>
+              </div>
+              <div class="col-md-4">
+                <div><b>偏见方向（frame）：</b><span id="c-side">—</span></div>
+                <div class="small text-muted">side_probs：<code id="c-side-probs">[]</code></div>
+              </div>
+              <div class="col-md-4">
+                <div><b>偏见强度：</b><span id="c-strength">—</span></div>
+                <div class="small text-muted">strength_probs：<code id="c-strength-probs">[]</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 右侧：统计（隐藏主题名） -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="fw-bold">总体统计</h6>
+          <div class="small text-muted" id="global-stats">加载中…</div>
+          <canvas id="chart-topic" height="240"></canvas>
+          <div class="mt-3">
+            <h6 class="fw-bold">偏见类型分布</h6>
+            <ul id="bias-types" class="small list-unstyled mb-0"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- 自包含前端逻辑 -->
+<script>
+(function(){
+  const $ = (sel) => document.querySelector(sel);
+
+  // DOM
+  const elId   = $("#article-id");
+  const elT    = $("#title");
+  const elTxt  = $("#text");
+  const elTopicBadge = $("#topic-badge");
+  const selTopic = $("#topic-select");
+  const btnRefresh = $("#btn-refresh");
+
+  // 渲染
+  function renderArticle(a){
+    if(!a){ return; }
+    elId.textContent = "#" + a.id;
+    elT.textContent  = a.title || "";
+    elTxt.textContent = a.text || "";
+    elTopicBadge.textContent = a.topic || "(topic)";
+    window.__CURRENT_ARTICLE_ID__ = a.id;
+  }
+
+  async function fetchArticle({topic="", id=null}={}){
+    const qs = new URLSearchParams();
+    if(topic) qs.set("topic", topic);
+    if(id!=null) qs.set("id", id);
+    const resp = await fetch("/api/sample" + (qs.toString()? ("?"+qs.toString()):""));
+    const data = await resp.json();
+    if(!data.ok) throw new Error(data.error || "加载失败");
+    renderArticle(data.article);
+  }
+
+  async function fillTopics(){
+    const r = await fetch("/api/topics");
+    const j = await r.json();
+    if(!j.ok) return;
+    selTopic.innerHTML = `<option value="">所有主题</option>`;
+    (j.topics || []).forEach(t=>{
+      const opt = document.createElement("option");
+      opt.value = t.topic || "";
+      // 只显示名字，不带数字
+      opt.textContent = t.topic || "(未标)";
+      selTopic.appendChild(opt);
+    });
+  }
+
+  async function loadStats(){
+    const elInfo = document.getElementById("global-stats");
+    const elList = document.getElementById("bias-types");
+    const ctx    = document.getElementById("chart-topic");
+
+    try{
+      const r = await fetch("/api/stats");
+      const j = await r.json();
+      if(!j.ok) throw new Error(j.error || "统计接口失败");
+
+      const g = j.global || {votes:0, bias_yes:0, bias_rate:0};
+      elInfo.textContent = `投票数：${g.votes}，偏见判定：${g.bias_yes}（比例 ${(g.bias_rate*100).toFixed(1)}%）`;
+
+      // 偏见类型分布（frame五类）
+      elList.innerHTML = "";
+      const types = j.bias_types || {};
+      const entries = Object.entries(types).sort((a,b)=>b[1]-a[1]);
+      if(entries.length===0){
+        elList.innerHTML = '<li class="text-muted">暂无数据</li>';
+      }else{
+        entries.forEach(([k,v])=>{
+          const li = document.createElement("li");
+          li.textContent = `${k}: ${v}`;
+          elList.appendChild(li);
+        });
+      }
+
+      // 主题图表：隐藏主题名字（不渲染labels，x轴刻度文本为空）
+      if (ctx){
+        const values = (j.by_topic||[]).map(x=>x.bias_rate*100);
+        if (window.__topic_chart__) { window.__topic_chart__.destroy(); }
+        window.__topic_chart__ = new Chart(ctx, {
+          type: 'bar',
+          data: { 
+            labels: values.map(()=>""), // 不显示任何主题名
+            datasets: [{ label: '各主题偏见比例(%)', data: values }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { ticks: { callback: () => "" } },  // 隐藏x轴文字
+              y: { beginAtZero: true, max: 100 }
+            },
+            plugins: {
+              legend: { display: true } // 只显示数据集名，不显示主题名
+            }
+          }
+        });
+      }
+    }catch(e){
+      console.error(e);
+      elInfo.textContent = "统计加载失败：" + e.message;
+    }
+  }
+
+  // 初始
+  (async ()=>{
+    try{
+      await fillTopics();
+      await fetchArticle({ topic: selTopic.value || "" });
+      await loadStats();
+    }catch(e){
+      console.error(e);
+      alert("初始化失败：" + e.message);
+    }
+  })();
+
+  // 换一篇 / 主题切换 / 键盘R
+  btnRefresh?.addEventListener("click", async ()=>{
+    try{ await fetchArticle({ topic: selTopic.value || "" }); }catch(e){ alert("加载失败：" + e.message); }
+  });
+  document.addEventListener("keydown", async (ev)=>{
+    if(ev.key.toLowerCase()==="r"){
+      try{ await fetchArticle({ topic: selTopic.value || "" }); }catch(e){}
+    }
+  });
+  selTopic?.addEventListener("change", async ()=>{
+    try{ await fetchArticle({ topic: selTopic.value || "" }); }catch(e){ alert("加载失败：" + e.message); }
+  });
+
+  // 写作评分（BERT）
+  $("#btn-score-compose")?.addEventListener("click", async () => {
+    const ta   = $("#compose-text");
+    const hint = $("#compose-hint");
+    const box  = $("#compose-result");
+    const v = (ta.value || "").trim();
+    if (!v) { alert("请先写一段新闻。"); return; }
+
+    const btn = $("#btn-score-compose");
+    btn.disabled = true; const old = btn.textContent; btn.textContent = "评分中…"; hint.textContent = "";
+
+    try {
+      const resp = await fetch("/api/score-user-news", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ text: v })
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "评分失败");
+
+      const r = data.result || {};
+      $("#c-yes").textContent = r.bias_yes ? "有偏见 (1)" : "无偏见 (0)";
+      $("#c-proba").textContent = (r.proba_yes != null) ? r.proba_yes.toFixed(3) : "—";
+      $("#c-side").textContent = r.side || "—";
+      const mapStrength = {0:"0（无/轻微）", 1:"1（中）", 2:"2（强）"};
+      $("#c-strength").textContent = (r.strength_cls in mapStrength) ? mapStrength[r.strength_cls] : String(r.strength_cls);
+      $("#c-side-probs").textContent = JSON.stringify(r.side_probs || [], null, 0);
+      $("#c-strength-probs").textContent = JSON.stringify(r.strength_probs || [], null, 0);
+
+      box.classList.remove("d-none");
+      box.scrollIntoView({behavior:"smooth", block:"nearest"});
+      hint.textContent = "已完成。";
+    } catch (err) {
+      alert("评分失败：" + err.message);
+      hint.textContent = "评分失败。";
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+      setTimeout(()=> hint.textContent="", 1200);
+    }
+  });
+
+  // 提交并下一篇（刷新统计）
+  const form = document.getElementById("judge-form");
+  if (form && !form.__wired){
+    form.__wired = true;
+    form.addEventListener("submit", async (ev)=>{
+      ev.preventDefault();
+      try{
+        const aid = window.__CURRENT_ARTICLE_ID__;
+        const bias_yes = Number(document.querySelector('input[name="bias_yes"]:checked')?.value || 0);
+        const bias_side = document.getElementById("bias_side").value;
+        const bias_strength = Number(document.getElementById("bias_strength").value||0);
+        const reasons = document.getElementById("reasons").value || "";
+        const selFrame = document.querySelector('input[name="frame_type"]:checked');
+        const bias_types = selFrame ? [selFrame.value] : [];
+
+        const r = await fetch("/api/submit",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ article_id: aid, bias_yes, bias_side, bias_strength, reasons, bias_types })
+        });
+        const j = await r.json();
+        if(!j.ok) throw new Error(j.error||"提交失败");
+
+        await fetchArticle({ topic: document.getElementById("topic-select").value || "" });
+        await loadStats();
+        document.getElementById("reasons").value = "";
+      }catch(e){
+        alert("提交失败：" + e.message);
+      }
+    });
+  }
+
+})();
+</script>
+</body>
+</html>

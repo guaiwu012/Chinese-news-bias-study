@@ -1,0 +1,4 @@
+body { font-feature-settings: 'tnum' 1; }
+#text { line-height: 1.7; }
+.card { border-radius: 1rem; }
+.badge { font-weight: 600; }

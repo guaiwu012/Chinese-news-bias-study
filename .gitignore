@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.db
+*.pt
+*.bin
+output.csv
+.venv/
+env/
+venv/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+.vscode/
+*.zip

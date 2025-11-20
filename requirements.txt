@@ -1,0 +1,11 @@
+Flask==3.0.3
+Flask-Cors==4.0.1
+pandas==2.2.2
+numpy==1.26.4
+SQLAlchemy==2.0.35
+scikit-learn==1.5.2
+joblib==1.4.2
+transformers==4.44.2
+accelerate==0.34.2
+torch>=2.1.0
+datasets==3.0.1
